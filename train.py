@@ -7,7 +7,9 @@ import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 
 from nltk_utils import bag_of_words, tokenize, stem
-from model import NeuralNet #Esto es lo que ustedes tienen que hacer
+from model import SimpleChatbotModel #Esto es lo que ustedes tienen que hacer
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 with open('intents.json', 'r') as f:
     intents = json.load(f)
@@ -52,8 +54,8 @@ for (pattern_sentence, tag) in xy:
 
 #En este punto se terminan de generar los datos de entrenamiento con los datos
 #preprocesados del archivo intents.json
-X_train = np.array(X_train)
-y_train = np.array(y_train)
+X_train = torch.Tensor(X_train).long()
+y_train = torch.Tensor(y_train).long()
 
 # Hyper-parameters 
 num_epochs = 1000 #Justifiquen este valor
@@ -65,19 +67,17 @@ output_size = len(tags)
 print(input_size, output_size)
 
 class ChatDataset(Dataset):
-
     def __init__(self):
         self.n_samples = len(X_train)
-        self.x_data = X_train
-        self.y_data = y_train
+        self.x_data = torch.Tensor(X_train)
+        self.y_data = torch.Tensor(y_train).long()  # Asegúrate de que sea de tipo long
 
-    # support indexing such that dataset[i] can be used to get i-th sample
     def __getitem__(self, index):
         return self.x_data[index], self.y_data[index]
 
-    # we can call len(dataset) to return the size
     def __len__(self):
         return self.n_samples
+
 
 dataset = ChatDataset()
 train_loader = DataLoader(dataset=dataset,
@@ -86,7 +86,7 @@ train_loader = DataLoader(dataset=dataset,
                           num_workers=0)
 
 #¿Qué será ese device?
-model = NeuralNet(input_size, hidden_size, output_size).to(device)
+model = SimpleChatbotModel(input_size, hidden_size, output_size).to(device)
 
 # Loss and optimizer
 criterion = nn.CrossEntropyLoss()
@@ -95,24 +95,35 @@ optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 #Ajustar esto si lo hacen con Tensorflow y ni se diga si lo hacen con
 #Pycuda
 # Train the model
+# Train the model
 for epoch in range(num_epochs):
+    total_correct = 0
+    total_samples = 0
+
     for (words, labels) in train_loader:
         words = words.to(device)
-        labels = labels.to(dtype=torch.long).to(device)
+        labels = labels.to(device)
         
         # Forward pass
         outputs = model(words)
-        # if y would be one-hot, we must apply
-        # labels = torch.max(labels, 1)[1]
         loss = criterion(outputs, labels)
         
         # Backward and optimize
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+        # Compute accuracy
+        _, predicted = torch.max(outputs, 1)
+        total_correct += (predicted == labels).sum().item()
+        total_samples += labels.size(0)
         
     if (epoch+1) % 100 == 0:
-        print (f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}')
+        accuracy = total_correct / total_samples
+        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Accuracy: {accuracy:.4f}')
+
+print(f'final loss: {loss.item():.4f}, final accuracy: {accuracy:.4f}')
+
 
 
 print(f'final loss: {loss.item():.4f}')
