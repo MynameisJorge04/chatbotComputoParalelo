@@ -20,14 +20,12 @@ class TimeCallback(Callback):
         self.start = time.time()
     def on_epoch_end(self, epoch, logs=None):
         end = time.time()
-        self.times.append(end - self.start)
-        print('Epoch time: ', end - self.start)
+        self.times.append(end - self.start + (self.times[-1] if len(self.times) > 0 else 0))
 
 
 def create_vectorize_layer(text_array):
     max_features = 10000
     sequence_length = 100
-    embedding_dim = 128
     vectoirzer_layer = layers.TextVectorization(
         max_tokens=max_features,
         output_mode='int',
@@ -39,7 +37,6 @@ def create_vectorize_layer(text_array):
 
 def create_model(vectorizer_layer):
     max_features = 10000
-    sequence_length = 100
     embedding_dim = 128
     model = tf.keras.Sequential([
         layers.Embedding(max_features, embedding_dim),
@@ -61,9 +58,9 @@ def create_model(vectorizer_layer):
 def vectorize_text(text, vectoirzer_layer):
     text = tf.expand_dims(text, -1)
     return vectoirzer_layer(text)
+   
     
-    
-def main():
+def main(device):
     time_clallback = TimeCallback()
     columns = ['text', 'label']
     data = pd.read_csv('data.csv', encoding='utf-8', header=None, names=columns)
@@ -78,12 +75,18 @@ def main():
     print(x_train_vect.shape)
     print(y_train.shape)
     model = create_model(vectorizer_layer)
-    model.fit(x_train_vect, y_train, validation_data=(x_test_vect, y_test), epochs=10, batch_size=32, callbacks=[time_clallback])
-    print('Epoch times: ', time_clallback.times)
-    model.save('model.keras')
+    vals = model.fit(x_train_vect, y_train, validation_data=(x_test_vect, y_test), epochs=10, batch_size=32, callbacks=[time_clallback])
+    history = vals.history
+    history['time'] = time_clallback.times
+    history = pd.DataFrame(history)
+    history.to_csv(f'data/history_{device}.csv', index=False)
+    model.save(f'data/model_{device}.keras')
     
     
 if __name__ == '__main__':
-    main()
+    tf.device('/gpu:0')
+    main("gpu")
+    tf.device('/cpu:0')
+    main('cpu')
 
     
