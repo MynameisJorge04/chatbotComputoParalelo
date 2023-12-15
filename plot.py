@@ -15,7 +15,8 @@ def main(file, device):
     plt.savefig(f'plots/metrics_{device}.png')
     plt.clf()
     
-    plt.plot(data['time'], label='Time')
+    epochs = range(1, len(data['time']) + 1)
+    plt.bar(x=epochs, height=data['time'], label='Time')
     plt.xlabel('Epochs')
     plt.ylabel('Time')
     plt.title('Time')
