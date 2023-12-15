@@ -1,144 +1,89 @@
+import os
 import numpy as np
-import random
-import json
+import pandas as pd
 
-import torch
-import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+import tensorflow as tf
+import tensorflow_hub as hub
 
-from nltk_utils import bag_of_words, tokenize, stem
-from model import SimpleChatbotModel #Esto es lo que ustedes tienen que hacer
+from keras import layers
+from keras import losses
+from keras.callbacks import Callback
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+import time
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-with open('intents.json', 'r') as f:
-    intents = json.load(f)
-
-all_words = []
-tags = []
-xy = []
-# loop through each sentence in our intents patterns
-for intent in intents['intents']:
-    tag = intent['tag']
-    # add to tag list
-    tags.append(tag)
-    for pattern in intent['patterns']:
-        # tokenize each word in the sentence
-        w = tokenize(pattern)
-        # add to our words list
-        all_words.extend(w)
-        # add to xy pair
-        xy.append((w, tag))
-
-# stem and lower each word
-ignore_words = ['?', '.', '!']
-all_words = [stem(w) for w in all_words if w not in ignore_words]
-# remove duplicates and sort
-all_words = sorted(set(all_words))
-tags = sorted(set(tags))
-
-print(len(xy), "patterns")
-print(len(tags), "tags:", tags)
-print(len(all_words), "unique stemmed words:", all_words)
-
-# create training data
-X_train = []
-y_train = []
-for (pattern_sentence, tag) in xy:
-    # X: bag of words for each pattern_sentence
-    bag = bag_of_words(pattern_sentence, all_words)
-    X_train.append(bag)
-    # y: PyTorch CrossEntropyLoss needs only class labels, not one-hot
-    label = tags.index(tag)
-    y_train.append(label)
-
-#En este punto se terminan de generar los datos de entrenamiento con los datos
-#preprocesados del archivo intents.json
-X_train = torch.Tensor(X_train).long()
-y_train = torch.Tensor(y_train).long()
-
-# Hyper-parameters 
-num_epochs = 1000 #Justifiquen este valor
-batch_size = 8
-learning_rate = 0.001 #Justifiquen este valor
-input_size = len(X_train[0])
-hidden_size = 8
-output_size = len(tags)
-print(input_size, output_size)
-
-class ChatDataset(Dataset):
+class TimeCallback(Callback):
     def __init__(self):
-        self.n_samples = len(X_train)
-        self.x_data = torch.Tensor(X_train)
-        self.y_data = torch.Tensor(y_train).long()  # Asegúrate de que sea de tipo long
-
-    def __getitem__(self, index):
-        return self.x_data[index], self.y_data[index]
-
-    def __len__(self):
-        return self.n_samples
-
-
-dataset = ChatDataset()
-train_loader = DataLoader(dataset=dataset,
-                          batch_size=batch_size,
-                          shuffle=True,
-                          num_workers=0)
-
-#¿Qué será ese device?
-model = SimpleChatbotModel(input_size, hidden_size, output_size).to(device)
-
-# Loss and optimizer
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
-#Ajustar esto si lo hacen con Tensorflow y ni se diga si lo hacen con
-#Pycuda
-# Train the model
-# Train the model
-for epoch in range(num_epochs):
-    total_correct = 0
-    total_samples = 0
-
-    for (words, labels) in train_loader:
-        words = words.to(device)
-        labels = labels.to(device)
-        
-        # Forward pass
-        outputs = model(words)
-        loss = criterion(outputs, labels)
-        
-        # Backward and optimize
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-
-        # Compute accuracy
-        _, predicted = torch.max(outputs, 1)
-        total_correct += (predicted == labels).sum().item()
-        total_samples += labels.size(0)
-        
-    if (epoch+1) % 100 == 0:
-        accuracy = total_correct / total_samples
-        print(f'Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}, Accuracy: {accuracy:.4f}')
-
-print(f'final loss: {loss.item():.4f}, final accuracy: {accuracy:.4f}')
+        self.times = []
+        self.start = None
+    def on_epoch_begin(self, epoch, logs=None):
+        self.start = time.time()
+    def on_epoch_end(self, epoch, logs=None):
+        end = time.time()
+        self.times.append(end - self.start)
+        print('Epoch time: ', end - self.start)
 
 
+def create_vectorize_layer(text_array):
+    max_features = 10000
+    sequence_length = 100
+    embedding_dim = 128
+    vectoirzer_layer = layers.TextVectorization(
+        max_tokens=max_features,
+        output_mode='int',
+        output_sequence_length=sequence_length
+    )
+    vectoirzer_layer.adapt(text_array)
+    return vectoirzer_layer
+    
 
-print(f'final loss: {loss.item():.4f}')
+def create_model(vectorizer_layer):
+    max_features = 10000
+    sequence_length = 100
+    embedding_dim = 128
+    model = tf.keras.Sequential([
+        layers.Embedding(max_features, embedding_dim),
+        layers.Dropout(0.2),
+        layers.GlobalAveragePooling1D(),
+        layers.Dropout(0.2),
+        layers.Dense(12, activation='softmax')
+    ])
+    model.compile(
+        loss=losses.CategoricalCrossentropy(),
+        optimizer='adam',
+        metrics=['accuracy']
+    )
+    model.build((None, ))
+    model.summary()
+    return model
+    
+    
+def vectorize_text(text, vectoirzer_layer):
+    text = tf.expand_dims(text, -1)
+    return vectoirzer_layer(text)
+    
+    
+def main():
+    time_clallback = TimeCallback()
+    columns = ['text', 'label']
+    data = pd.read_csv('data.csv', encoding='utf-8', header=None, names=columns)
+    X = data['text'].values
+    y = data['label'].values
+    clases = np.unique(y)
+    y_onehot = OneHotEncoder().fit_transform(y.reshape(-1, 1)).toarray()
+    x_train, x_test, y_train, y_test = train_test_split(X, y_onehot, test_size=0.2)
+    vectorizer_layer = create_vectorize_layer(x_train)
+    x_train_vect = vectorize_text(x_train, vectorizer_layer)
+    x_test_vect = vectorize_text(x_test, vectorizer_layer)
+    print(x_train_vect.shape)
+    print(y_train.shape)
+    model = create_model(vectorizer_layer)
+    model.fit(x_train_vect, y_train, validation_data=(x_test_vect, y_test), epochs=10, batch_size=32, callbacks=[time_clallback])
+    print('Epoch times: ', time_clallback.times)
+    model.save('model.keras')
+    
+    
+if __name__ == '__main__':
+    main()
 
-data = {
-"model_state": model.state_dict(),
-"input_size": input_size,
-"hidden_size": hidden_size,
-"output_size": output_size,
-"all_words": all_words,
-"tags": tags
-}
-
-
-FILE = "data.pth"
-torch.save(data, FILE)
-
-print(f'training complete. file saved to {FILE}')
+    
