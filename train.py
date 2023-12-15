@@ -12,12 +12,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import OneHotEncoder
 import time
 
+
 class TimeCallback(Callback):
+
     def __init__(self):
         self.times = []
         self.start = None
+
     def on_epoch_begin(self, epoch, logs=None):
         self.start = time.time()
+
     def on_epoch_end(self, epoch, logs=None):
         end = time.time()
         self.times.append(end - self.start + (self.times[-1] if len(self.times) > 0 else 0))
@@ -50,7 +54,7 @@ def create_model(vectorizer_layer):
         optimizer='adam',
         metrics=['accuracy']
     )
-    model.build((None, ))
+    model.build((None,))
     model.summary()
     return model
     
@@ -88,5 +92,4 @@ if __name__ == '__main__':
     main("gpu")
     tf.device('/cpu:0')
     main('cpu')
-
     

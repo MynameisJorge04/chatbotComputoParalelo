@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
+
 def main(file, device):
     data = pd.read_csv(file)
     plt.plot(data['accuracy'], label='Accuracy')
@@ -28,5 +29,4 @@ def main(file, device):
 if __name__ == '__main__':
     main('data/history_cpu.csv', 'cpu')
     main('data/history_gpu.csv', 'gpu')
-    
     
