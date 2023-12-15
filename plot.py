@@ -10,7 +10,7 @@ def main(file, device):
 
     plt.xlabel('Epochs')
     plt.ylabel('Metrics')
-    plt.title('Training Metrics')
+    plt.title(f'Training Metrics {device}')
     plt.legend()
     plt.savefig(f'plots/metrics_{device}.png')
     plt.clf()
@@ -19,7 +19,7 @@ def main(file, device):
     plt.bar(x=epochs, height=data['time'], label='Time')
     plt.xlabel('Epochs')
     plt.ylabel('Time')
-    plt.title('Time')
+    plt.title(f'Time {device}')
     plt.legend()
     plt.savefig(f'plots/time_{device}.png')
     plt.clf()
