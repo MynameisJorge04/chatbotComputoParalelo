@@ -39,7 +39,7 @@ def create_vectorize_layer(text_array):
     return vectoirzer_layer
     
 
-def create_model(vectorizer_layer):
+def create_model():
     max_features = 10000
     embedding_dim = 128
     model = tf.keras.Sequential([
@@ -71,6 +71,8 @@ def main(device):
     X = data['text'].values
     y = data['label'].values
     clases = np.unique(y)
+    df_clases = pd.DataFrame(clases, columns=['clases'])
+    df_clases.to_csv('data/clases.csv', index=False)
     y_onehot = OneHotEncoder().fit_transform(y.reshape(-1, 1)).toarray()
     x_train, x_test, y_train, y_test = train_test_split(X, y_onehot, test_size=0.2)
     vectorizer_layer = create_vectorize_layer(x_train)
@@ -78,7 +80,7 @@ def main(device):
     x_test_vect = vectorize_text(x_test, vectorizer_layer)
     print(x_train_vect.shape)
     print(y_train.shape)
-    model = create_model(vectorizer_layer)
+    model = create_model()
     vals = model.fit(x_train_vect, y_train, validation_data=(x_test_vect, y_test), epochs=10, batch_size=32, callbacks=[time_clallback])
     history = vals.history
     history['time'] = time_clallback.times
