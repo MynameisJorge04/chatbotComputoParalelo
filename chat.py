@@ -3,8 +3,11 @@ import gradio as gr
 import random
 import time
 import pandas as pd
+import json
 
 with gr.Blocks() as demo:
+    with open("data/respuestas.json", "r") as f:
+        respuestas = json.load(f)
     columns = ['text', 'label']
     data = pd.read_csv('data.csv', encoding='utf-8', header=None, names=columns)
     X = data['text'].values
@@ -20,13 +23,10 @@ with gr.Blocks() as demo:
 
     def respond(message, chat_history):
         vectorized_message = vectorize_text([message], vectorizer_layer)
-        print(vectorized_message.shape)
         prediction = model.predict(vectorized_message)
-        print(prediction)
         class_index = prediction.argmax(axis=1)[0]
-        print(class_index)
-        bot_message = clases[class_index]
-        print(bot_message)
+        class_name = clases[class_index]
+        bot_message = random.choice(respuestas[class_name])
         chat_history.append((message, bot_message))
         time.sleep(2)
         return "", chat_history
