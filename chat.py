@@ -6,7 +6,7 @@ import pandas as pd
 import json
 
 with gr.Blocks() as demo:
-    with open("data/respuestas.json", "r") as f:
+    with open("data/respuestas.json", "r", encoding='utf-8') as f:
         respuestas = json.load(f)
     columns = ['text', 'label']
     data = pd.read_csv('data.csv', encoding='utf-8', header=None, names=columns)
@@ -24,8 +24,10 @@ with gr.Blocks() as demo:
     def respond(message, chat_history):
         vectorized_message = vectorize_text([message], vectorizer_layer)
         prediction = model.predict(vectorized_message)
+        print(prediction)
         class_index = prediction.argmax(axis=1)[0]
         class_name = clases[class_index]
+        print(class_name)
         bot_message = random.choice(respuestas[class_name])
         chat_history.append((message, bot_message))
         time.sleep(2)

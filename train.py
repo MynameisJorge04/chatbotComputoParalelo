@@ -16,6 +16,7 @@ import time
 class TimeCallback(Callback):
 
     def __init__(self):
+        super().__init__()
         self.times = []
         self.start = None
 
@@ -90,8 +91,6 @@ def main(device):
     
     
 if __name__ == '__main__':
-    tf.device('/gpu:0')
-    main("gpu")
     tf.device('/cpu:0')
     main('cpu')
     
